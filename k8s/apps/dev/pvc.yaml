@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lms-data
+  namespace: staging
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: <storageclass-du-cluster>                      # A CONFIRMER (Jules)
+  resources:
+    requests:
+      storage: 5Gi
