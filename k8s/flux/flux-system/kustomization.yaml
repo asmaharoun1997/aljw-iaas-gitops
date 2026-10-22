@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - https://github.com/fluxcd/flux2/releases/download/v2.9.6/install.yaml
+patches:
+  - target: { kind: Deployment }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value: { "kubernetes.io/os": linux, pool: main }
+replicas:
+  - { name: helm-controller, count: 0 }
+  - { name: image-reflector-controller, count: 0 }
+  - { name: image-automation-controller, count: 0 }
+  - { name: notification-controller, count: 0 }
+  - { name: source-watcher, count: 0 }
