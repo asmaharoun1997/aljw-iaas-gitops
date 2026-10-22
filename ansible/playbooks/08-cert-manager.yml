@@ -1,8 +1,9 @@
 ---
-# cert-manager (Helm, chart figé) et ClusterIssuer Let's Encrypt STAGING, solveur HTTP-01 via Traefik.
+# cert-manager (Helm, chart figé) et ClusterIssuers Let's Encrypt staging et production, solveur HTTP-01 via Traefik.
 # L'adresse e-mail n'est écrite dans aucun fichier : ansible-playbook playbooks/08-cert-manager.yml -e letsencrypt_email=<adresse>
 # Staging : les certificats émis ne sont pas reconnus par les navigateurs (normal, pour tester la chaîne).
-- name: Installer cert-manager et le ClusterIssuer de staging
+# Production : certificats reconnus, limites Let's Encrypt strictes (ne pas émettre de certificat de test).
+- name: Installer cert-manager et les ClusterIssuers Let's Encrypt
   hosts: control_plane
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
@@ -72,4 +73,30 @@
     - name: Attendre que le ClusterIssuer soit Ready
       ansible.builtin.command: >
         kubectl wait --for=condition=Ready clusterissuer/letsencrypt-staging --timeout=120s
+      changed_when: false
+
+    - name: Appliquer le ClusterIssuer letsencrypt-prod
+      ansible.builtin.shell: |
+        kubectl apply -f - <<'EOF_ISSUER'
+        apiVersion: cert-manager.io/v1
+        kind: ClusterIssuer
+        metadata:
+          name: letsencrypt-prod
+        spec:
+          acme:
+            server: https://acme-v02.api.letsencrypt.org/directory
+            email: "{{ letsencrypt_email }}"
+            privateKeySecretRef:
+              name: letsencrypt-prod-account-key
+            solvers:
+              - http01:
+                  ingress:
+                    ingressClassName: traefik
+        EOF_ISSUER
+      register: issuer_prod
+      changed_when: "'unchanged' not in issuer_prod.stdout"
+
+    - name: Attendre que le ClusterIssuer de production soit Ready
+      ansible.builtin.command: >
+        kubectl wait --for=condition=Ready clusterissuer/letsencrypt-prod --timeout=120s
       changed_when: false

@@ -1,6 +1,6 @@
 ---
 # Preuve de la chaîne LB -> Traefik -> HTTP-01 -> certificat (staging) avec un whoami dans le namespace cert-test.
-# Rejouable : ansible-playbook playbooks/09-test-cert-chain.yml
+# Rejouable : ansible-playbook playbooks/10-test-cert-chain.yml
 # Ce playbook ne supprime rien ; le nettoyage (kubectl delete namespace cert-test) se fait à la main, sur accord.
 - name: Tester la chaîne complète de certificat
   hosts: control_plane
