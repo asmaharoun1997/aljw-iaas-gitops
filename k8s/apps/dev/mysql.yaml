@@ -56,7 +56,7 @@ spec:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: <storageclass-du-cluster>   # A CONFIRMER (Jules)
+        storageClassName: local-path
         resources:
           requests:
             storage: 5Gi
