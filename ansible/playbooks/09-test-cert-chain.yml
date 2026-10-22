@@ -1,0 +1,42 @@
+---
+# Preuve de la chaîne LB -> Traefik -> HTTP-01 -> certificat (staging) avec un whoami dans le namespace cert-test.
+# Rejouable : ansible-playbook playbooks/09-test-cert-chain.yml
+# Ce playbook ne supprime rien ; le nettoyage (kubectl delete namespace cert-test) se fait à la main, sur accord.
+- name: Tester la chaîne complète de certificat
+  hosts: control_plane
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Copier le manifeste de test
+      ansible.builtin.copy:
+        src: ../files/cert-test-whoami.yaml
+        dest: /root/cert-test-whoami.yaml
+        mode: "0600"
+
+    - name: Appliquer le manifeste whoami
+      ansible.builtin.command: kubectl apply -f /root/cert-test-whoami.yaml
+      register: apply_out
+      changed_when: "'unchanged' not in apply_out.stdout"
+
+    - name: Attendre que whoami soit prêt
+      ansible.builtin.command: kubectl -n cert-test wait --for=condition=Available deployment/whoami --timeout=120s
+      changed_when: false
+
+    - name: Attendre que le Certificate soit Ready (3 min maximum)
+      ansible.builtin.command: kubectl -n cert-test wait --for=condition=Ready certificate/whoami-tls --timeout=180s
+      register: cert_wait
+      changed_when: false
+      failed_when: false
+
+    - name: Certificate, Order et Challenge
+      ansible.builtin.command: kubectl -n cert-test get certificate,order,challenge
+      register: chain
+      changed_when: false
+
+    - name: Afficher la chaîne
+      ansible.builtin.debug:
+        var: chain.stdout_lines
+
+    - name: Conclusion
+      ansible.builtin.debug:
+        msg: "{{ 'Certificate Ready' if cert_wait.rc == 0 else 'Certificate NON prêt : voir kubectl describe certificate/order/challenge -n cert-test' }}"

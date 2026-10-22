@@ -1,0 +1,75 @@
+---
+# cert-manager (Helm, chart figé) et ClusterIssuer Let's Encrypt STAGING, solveur HTTP-01 via Traefik.
+# L'adresse e-mail n'est écrite dans aucun fichier : ansible-playbook playbooks/08-cert-manager.yml -e letsencrypt_email=<adresse>
+# Staging : les certificats émis ne sont pas reconnus par les navigateurs (normal, pour tester la chaîne).
+- name: Installer cert-manager et le ClusterIssuer de staging
+  hosts: control_plane
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Adresse e-mail Let's Encrypt obligatoire
+      ansible.builtin.assert:
+        that: letsencrypt_email is defined and letsencrypt_email | length > 0
+        fail_msg: "Passer -e letsencrypt_email=<adresse> (jamais dans un fichier versionné)"
+
+    - name: Dépôt Helm de Jetstack
+      ansible.builtin.shell: |
+        helm repo add jetstack https://charts.jetstack.io --force-update
+        helm repo update jetstack
+      changed_when: false
+
+    - name: Version de cert-manager déjà déployée
+      ansible.builtin.command: helm list -n cert-manager --filter '^cert-manager$' -o json
+      register: cm_current
+      changed_when: false
+
+    - name: Valider le chart (helm template)
+      ansible.builtin.command: >
+        helm template cert-manager jetstack/cert-manager --version {{ cert_manager_chart_version }}
+        -n cert-manager --set crds.enabled=true
+      changed_when: false
+      when: (cm_current.stdout | from_json | length) == 0
+
+    - name: Installer cert-manager
+      ansible.builtin.command: >
+        helm upgrade --install cert-manager jetstack/cert-manager --version {{ cert_manager_chart_version }}
+        -n cert-manager --create-namespace --set crds.enabled=true --wait --timeout 5m
+      changed_when: true
+      when: >-
+        (cm_current.stdout | from_json | length) == 0 or
+        (cm_current.stdout | from_json)[0].chart != 'cert-manager-' ~ cert_manager_chart_version
+
+    - name: Attendre que les 3 déploiements soient prêts
+      ansible.builtin.command: >
+        kubectl -n cert-manager wait --for=condition=Available deployment/{{ item }} --timeout=180s
+      loop:
+        - cert-manager
+        - cert-manager-cainjector
+        - cert-manager-webhook
+      changed_when: false
+
+    - name: Appliquer le ClusterIssuer letsencrypt-staging
+      ansible.builtin.shell: |
+        kubectl apply -f - <<'EOF_ISSUER'
+        apiVersion: cert-manager.io/v1
+        kind: ClusterIssuer
+        metadata:
+          name: letsencrypt-staging
+        spec:
+          acme:
+            server: https://acme-staging-v02.api.letsencrypt.org/directory
+            email: "{{ letsencrypt_email }}"
+            privateKeySecretRef:
+              name: letsencrypt-staging-account-key
+            solvers:
+              - http01:
+                  ingress:
+                    ingressClassName: traefik
+        EOF_ISSUER
+      register: issuer
+      changed_when: "'unchanged' not in issuer.stdout"
+
+    - name: Attendre que le ClusterIssuer soit Ready
+      ansible.builtin.command: >
+        kubectl wait --for=condition=Ready clusterissuer/letsencrypt-staging --timeout=120s
+      changed_when: false

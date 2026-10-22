@@ -28,3 +28,5 @@ helm_version: "v3.22.1"
 # Somme de contrôle : fichier .sha256sum officiel du même tarball (remplacer par la valeur littérale quand elle est notée).
 helm_sha256_url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz.sha256sum"
 traefik_chart_version: "42.1.2"
+# cert-manager : dernière version stable (v1.21.2, publiée le 11 sep, vérifiée sur GitHub et dans le dépôt Helm jetstack).
+cert_manager_chart_version: "v1.21.2"
