@@ -18,5 +18,9 @@ patches:
       - op: replace
         path: /spec/rules/0/host
         value: aljw-cluster-iaas.kn8x.net
-      - op: remove
-        path: /spec/tls
+      - op: replace
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-prod
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: aljw-cluster-iaas.kn8x.net
