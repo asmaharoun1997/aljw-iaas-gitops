@@ -1,0 +1,74 @@
+---
+# Traefik en DaemonSet (hostPort 80/443) sur les workers, installé depuis le master avec Helm.
+# Helm : dernière version 3 via le script officiel (non figée, à noter dans le dossier).
+# Le chart est d'abord validé avec "helm template" : une clé de values inconnue ou changée fait échouer ici, pas en prod.
+- name: Installer Helm et Traefik
+  hosts: control_plane
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Installer Helm 3 (script officiel)
+      ansible.builtin.shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Version de Helm
+      ansible.builtin.command: helm version --short
+      register: helm_v
+      changed_when: false
+
+    - name: Afficher la version de Helm
+      ansible.builtin.debug:
+        var: helm_v.stdout
+
+    - name: Dépôt Helm de Traefik
+      ansible.builtin.shell: |
+        helm repo add traefik https://traefik.github.io/charts --force-update
+        helm repo update
+      changed_when: true
+
+    - name: Copier les values de Traefik
+      ansible.builtin.copy:
+        src: ../files/traefik-values.yaml
+        dest: /root/traefik-values.yaml
+        mode: "0644"
+
+    - name: Valider le chart avec les values (helm template)
+      ansible.builtin.command: helm template traefik traefik/traefik -n traefik -f /root/traefik-values.yaml
+      register: tpl
+      changed_when: false
+      failed_when: tpl.rc != 0
+      no_log: false
+
+    - name: Installer Traefik
+      ansible.builtin.command: >
+        helm upgrade --install traefik traefik/traefik -n traefik --create-namespace
+        -f /root/traefik-values.yaml --wait --timeout 5m
+      changed_when: true
+
+    - name: État du DaemonSet
+      ansible.builtin.command: kubectl -n traefik get ds,pods -o wide
+      register: ds
+      changed_when: false
+
+    - name: Afficher l'état
+      ansible.builtin.debug:
+        var: ds.stdout_lines
+
+- name: Vérifier que Traefik écoute sur les ports 80 et 443 des workers
+  hosts: workers
+  tasks:
+    - name: "Test local du port 80 (404 attendu, aucune route définie)"
+      ansible.builtin.command: curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:80/
+      register: p80
+      changed_when: false
+
+    - name: "Test local du port 443 (404 attendu, certificat par défaut)"
+      ansible.builtin.command: curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:443/
+      register: p443
+      changed_when: false
+
+    - name: Résultat
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} : port 80 -> {{ p80.stdout }}, port 443 -> {{ p443.stdout }}"

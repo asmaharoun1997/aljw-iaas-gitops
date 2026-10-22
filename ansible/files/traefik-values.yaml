@@ -1,0 +1,41 @@
+# Traefik sur kubeadm (sans cloud-controller-manager : un Service LoadBalancer resterait en "Pending").
+# Choix : DaemonSet avec hostPort 80/443 sur les workers, derrière un équilibreur GCP
+# (passthrough réseau) créé par Terraform qui pointe vers les workers.
+# Valider avant installation : helm template traefik traefik/traefik -f traefik-values.yaml
+deployment:
+  kind: DaemonSet
+
+nodeSelector: {}   # tous les workers
+
+service:
+  spec:
+    type: ClusterIP   # pas de LoadBalancer : aucun contrôleur cloud sur kubeadm
+
+ports:
+  web:
+    port: 8000
+    hostPort: 80
+    # Pas de redirection globale HTTP->HTTPS : elle casserait le défi HTTP-01 de cert-manager.
+  websecure:
+    port: 8443
+    hostPort: 443
+    http:
+      tls:
+        enabled: true
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+
+providers:
+  kubernetesIngress:
+    enabled: true
+    publishedService:
+      enabled: false   # pas de Service LoadBalancer à publier
+
+accessLog:
+  enabled: true        # pour la supervision des logs d'accès pendant la bascule
+
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits: { memory: 256Mi }
