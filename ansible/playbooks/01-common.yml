@@ -1,0 +1,122 @@
+---
+# Prérequis communs : swap, modules noyau, sysctl, containerd, paquets Kubernetes.
+- name: Préparer tous les nœuds (containerd + kubeadm/kubelet/kubectl)
+  hosts: k8s
+  tasks:
+    - name: Désactiver le swap
+      ansible.builtin.command: swapoff -a
+      changed_when: false
+
+    - name: Retirer le swap de fstab
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\sswap\s.*)$'
+        replace: '# \1'
+
+    - name: Charger les modules noyau au démarrage
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+        mode: "0644"
+
+    - name: Charger les modules maintenant
+      community.general.modprobe:
+        name: "{{ item }}"
+        state: present
+      loop: [overlay, br_netfilter]
+
+    - name: Paramètres sysctl réseau
+      ansible.posix.sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_file: /etc/sysctl.d/99-k8s.conf
+        reload: true
+      loop:
+        - { key: net.bridge.bridge-nf-call-iptables, value: "1" }
+        - { key: net.bridge.bridge-nf-call-ip6tables, value: "1" }
+        - { key: net.ipv4.ip_forward, value: "1" }
+
+    - name: Installer les paquets de base
+      ansible.builtin.apt:
+        name: [apt-transport-https, ca-certificates, curl, gpg, jq]
+        update_cache: true
+        state: present
+
+    - name: Dossier des clés APT
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    # Debian 12 fournit containerd 1.6, trop ancien pour les Kubernetes récents :
+    # on prend containerd.io (1.7+) depuis le dépôt Docker.
+    - name: Clé du dépôt Docker (containerd.io)
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Dépôt APT Docker
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        filename: docker
+        state: present
+
+    - name: Installer containerd.io
+      ansible.builtin.apt:
+        name: containerd.io
+        update_cache: true
+        state: present
+
+    # Le fichier livré par containerd.io désactive le plugin CRI : on le régénère.
+    - name: Vérifier si la configuration containerd est déjà correcte
+      ansible.builtin.command: grep -q 'SystemdCgroup = true' /etc/containerd/config.toml
+      register: containerd_cfg
+      failed_when: false
+      changed_when: false
+
+    - name: Générer la configuration containerd (CRI actif, cgroup systemd)
+      ansible.builtin.shell: |
+        mkdir -p /etc/containerd
+        containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' > /etc/containerd/config.toml
+      when: containerd_cfg.rc != 0
+      notify: Redémarrer containerd
+
+    - name: Clé du dépôt Kubernetes
+      ansible.builtin.get_url:
+        url: "https://pkgs.k8s.io/core:/stable:/{{ k8s_minor }}/deb/Release.key"
+        dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+        mode: "0644"
+
+    - name: Dépôt APT Kubernetes
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/{{ k8s_minor }}/deb/ /"
+        filename: kubernetes
+        state: present
+
+    - name: Installer kubelet, kubeadm, kubectl
+      ansible.builtin.apt:
+        name: [kubelet, kubeadm, kubectl]
+        update_cache: true
+        state: present
+
+    - name: Figer les versions Kubernetes
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop: [kubelet, kubeadm, kubectl]
+
+    - name: Activer containerd et kubelet
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop: [containerd, kubelet]
+
+  handlers:
+    - name: Redémarrer containerd
+      ansible.builtin.systemd:
+        name: containerd
+        state: restarted

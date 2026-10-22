@@ -1,0 +1,21 @@
+# Copier en inventory.ini (ignoré par Git).
+# Les VM n'ont pas d'IP publique : SSH via le tunnel IAP + OS Login (compte Google).
+# ansible_host = NOM de l'instance (utilisé par le ProxyCommand IAP), pas l'IP.
+# L'ordre des workers compte : le 1er héberge GitLab (pool=gitlab), le 2e les applications.
+[control_plane]
+aljw-k8s-cp ansible_host=aljw-k8s-cp
+
+[workers]
+aljw-k8s-w1 ansible_host=aljw-k8s-w1
+aljw-k8s-w2 ansible_host=aljw-k8s-w2
+
+[k8s:children]
+control_plane
+workers
+
+[k8s:vars]
+# Nom d'utilisateur OS Login : gcloud compute os-login describe-profile --format='value(posixAccounts[0].username)'
+ansible_user=CHANGEME_OSLOGIN_USER
+# Clé créée par un premier "gcloud compute ssh ... --tunnel-through-iap" (enregistrée dans OS Login)
+ansible_ssh_private_key_file=~/.ssh/google_compute_engine
+ansible_ssh_common_args='-o ProxyCommand="gcloud compute start-iap-tunnel %h 22 --listen-on-stdin --zone=europe-west1-b --project=formation-equipe1" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'

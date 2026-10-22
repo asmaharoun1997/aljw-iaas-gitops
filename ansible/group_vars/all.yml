@@ -1,0 +1,23 @@
+---
+# Version de Kubernetes : à vérifier que le dépôt pkgs.k8s.io/core:/stable:/<version>/ existe
+k8s_minor: "v1.35"
+
+# IP interne du master (API server) et IP publique éventuelle (sinon laisser vide)
+control_plane_ip: "10.2.0.3"   # aljw-k8s-cp (Terraform d'Asma)
+control_plane_public_ip: ""
+
+# Réseau des pods / services : ne doit chevaucher NI le VPC, NI GKE (10.4.0.0/14, 10.8.0.0/20)
+pod_cidr: "192.168.0.0/16"
+service_cidr: "172.20.0.0/16"
+
+# CNI Calico (VXLAN, car l'IPIP n'est pas autorisé par défaut sur GCE) : vérifier la version
+calico_version: "v3.30.3"
+
+# Registre d'images (Artifact Registry) pour le credential provider
+registry_host: "europe-west1-docker.pkg.dev"
+
+# Stockage local pour les PVC (kubeadm n'a pas de StorageClass par défaut)
+local_path_version: "v0.0.31"
+
+credential_provider_bin_dir: /usr/local/bin/image-credential-providers
+credential_provider_config: /etc/kubernetes/image-credential-provider.yaml

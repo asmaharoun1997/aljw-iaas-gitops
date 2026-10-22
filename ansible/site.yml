@@ -1,0 +1,6 @@
+---
+- import_playbook: playbooks/01-common.yml
+- import_playbook: playbooks/02-credential-provider.yml
+- import_playbook: playbooks/03-control-plane.yml
+- import_playbook: playbooks/04-workers.yml
+- import_playbook: playbooks/05-cni-storage.yml

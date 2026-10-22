@@ -1,0 +1,8 @@
+# Local à ansible/ : le .gitignore racine du dépôt ne doit pas être modifié.
+inventory.ini
+*.retry
+*.kubeconfig
+kubeconfig*
+admin.conf
+*.pem
+*.key

@@ -1,0 +1,33 @@
+---
+- name: Générer la commande de join (sur le master)
+  hosts: control_plane
+  tasks:
+    - name: Créer un jeton de join de 2 h
+      ansible.builtin.command: kubeadm token create --ttl 2h --print-join-command
+      register: join_cmd
+      changed_when: true
+      no_log: true
+
+    - name: Mémoriser la commande pour les workers
+      ansible.builtin.set_fact:
+        worker_join_command: "{{ join_cmd.stdout }}"
+      no_log: true
+
+- name: Joindre les workers
+  hosts: workers
+  tasks:
+    - name: kubeadm join
+      ansible.builtin.command: "{{ hostvars[groups['control_plane'][0]].worker_join_command }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf
+      no_log: true
+
+- name: Étiqueter les nœuds
+  hosts: control_plane
+  tasks:
+    - name: "Premier worker de l'inventaire = GitLab, second = applications"
+      ansible.builtin.shell: |
+        export KUBECONFIG=/etc/kubernetes/admin.conf
+        kubectl label node {{ groups['workers'][0] }} pool=gitlab --overwrite
+        kubectl label node {{ groups['workers'][1] }} pool=main --overwrite
+      changed_when: true

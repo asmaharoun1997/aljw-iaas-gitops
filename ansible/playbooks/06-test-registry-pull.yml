@@ -1,0 +1,64 @@
+---
+# Preuve du credential provider : un pod SANS imagePullSecret tire une image privée d'aljw-docker.
+# Usage : ansible-playbook playbooks/06-test-registry-pull.yml -e test_image=<registre>/<projet>/aljw-docker/<image>:<tag>
+# Le pod de test (test-gar) est créé puis supprimé ; il ne touche à rien d'autre.
+- name: Tester le pull d'image privée sans imagePullSecret
+  hosts: control_plane
+  vars:
+    test_node: aljw-k8s-w2
+    kubectl: kubectl --kubeconfig /etc/kubernetes/admin.conf
+  tasks:
+    - name: Image à tester obligatoire
+      ansible.builtin.assert:
+        that: test_image is defined and test_image | length > 0
+        fail_msg: "Passer -e test_image=<image complète d'aljw-docker>"
+
+    - name: Nettoyer un ancien pod de test éventuel
+      ansible.builtin.command: "{{ kubectl }} delete pod test-gar --ignore-not-found --wait=true"
+      changed_when: false
+
+    - name: Créer le pod de test (aucun imagePullSecret, planifié sur un worker)
+      ansible.builtin.shell: |
+        {{ kubectl }} apply -f - <<'EOF_POD'
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: test-gar
+        spec:
+          nodeName: {{ test_node }}
+          restartPolicy: Never
+          containers:
+            - name: test
+              image: "{{ test_image }}"
+              imagePullPolicy: Always
+        EOF_POD
+      changed_when: true
+
+    - name: Attendre le résultat du pull (succès ou échec, jusqu'à 2 min)
+      ansible.builtin.shell: >
+        {{ kubectl }} get events --field-selector involvedObject.name=test-gar
+        -o jsonpath='{range .items[*]}{.reason}{" | "}{.message}{"\n"}{end}'
+      register: pull_events
+      until: "'Pulled' in pull_events.stdout or 'Failed' in pull_events.stdout or 'BackOff' in pull_events.stdout"
+      retries: 24
+      delay: 5
+      changed_when: false
+
+    - name: Événements du pod
+      ansible.builtin.debug:
+        var: pull_events.stdout_lines
+
+    - name: Vérifier qu'aucun imagePullSecret n'est défini sur le pod
+      ansible.builtin.command: "{{ kubectl }} get pod test-gar -o jsonpath='{.spec.imagePullSecrets}'"
+      register: ips
+      changed_when: false
+
+    - name: Conclusion
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'SUCCES : image tirée sans imagePullSecret' if ('Successfully pulled' in pull_events.stdout or 'already present' in pull_events.stdout) and ips.stdout | length == 0
+             else 'ECHEC ou résultat à lire : voir les événements ci-dessus' }}
+
+    - name: Supprimer le pod de test
+      ansible.builtin.command: "{{ kubectl }} delete pod test-gar --wait=false"
+      changed_when: true

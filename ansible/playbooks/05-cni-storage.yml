@@ -1,0 +1,55 @@
+---
+# CNI Calico (applique les NetworkPolicy) + stockage local pour les PVC.
+- name: Installer Calico et le provisioner de stockage
+  hosts: control_plane
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Opérateur Calico (server-side apply, CRD volumineuses)
+      ansible.builtin.command: >
+        kubectl apply --server-side --force-conflicts -f
+        https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/tigera-operator.yaml
+      changed_when: true
+
+    - name: Ressources personnalisées Calico
+      ansible.builtin.template:
+        src: ../templates/calico-custom-resources.yaml.j2
+        dest: /root/calico-custom-resources.yaml
+        mode: "0600"
+
+    - name: Attendre que la CRD de l'opérateur existe (jusqu'à 3 min)
+      ansible.builtin.command: kubectl get crd installations.operator.tigera.io
+      register: tigera_crd
+      until: tigera_crd.rc == 0
+      retries: 36
+      delay: 5
+      changed_when: false
+
+    - name: Attendre que la CRD soit prête
+      ansible.builtin.command: kubectl wait --for=condition=Established crd/installations.operator.tigera.io --timeout=120s
+      changed_when: false
+
+    - name: Appliquer la configuration Calico
+      ansible.builtin.command: kubectl apply -f /root/calico-custom-resources.yaml
+      changed_when: true
+
+    - name: Attendre que les 3 nœuds soient Ready
+      ansible.builtin.shell: |
+        kubectl get nodes --no-headers | awk '$2!="Ready"' | wc -l
+      register: not_ready
+      until: not_ready.stdout | int == 0
+      retries: 40
+      delay: 10
+      changed_when: false
+
+    - name: Provisioner de stockage local (local-path)
+      ansible.builtin.command: >
+        kubectl apply -f
+        https://raw.githubusercontent.com/rancher/local-path-provisioner/{{ local_path_version }}/deploy/local-path-storage.yaml
+      changed_when: true
+
+    - name: Rendre local-path la StorageClass par défaut
+      ansible.builtin.command: >
+        kubectl patch storageclass local-path -p
+        '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+      changed_when: true
