@@ -7,11 +7,35 @@
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   tasks:
-    - name: Installer Helm 3 (script officiel)
-      ansible.builtin.shell: |
-        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      args:
-        creates: /usr/local/bin/helm
+    - name: Version de Helm actuellement installée
+      ansible.builtin.command: helm version --short
+      register: helm_current
+      changed_when: false
+      failed_when: false
+
+    - name: "Télécharger Helm {{ helm_version }} (tarball officiel, somme de contrôle vérifiée)"
+      ansible.builtin.get_url:
+        url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"
+        dest: "/root/helm-{{ helm_version }}.tar.gz"
+        checksum: "sha256:{{ helm_sha256_url }}"
+        mode: "0600"
+      when: helm_version not in helm_current.stdout
+
+    - name: Installer le binaire helm
+      ansible.builtin.unarchive:
+        src: "/root/helm-{{ helm_version }}.tar.gz"
+        dest: /usr/local/bin
+        remote_src: true
+        include: ["linux-amd64/helm"]
+        extra_opts: ["--strip-components=1"]
+      when: helm_version not in helm_current.stdout
+
+    - name: Droits du binaire helm
+      ansible.builtin.file:
+        path: /usr/local/bin/helm
+        owner: root
+        group: root
+        mode: "0755"
 
     - name: Version de Helm
       ansible.builtin.command: helm version --short
@@ -32,18 +56,16 @@
       ansible.builtin.copy:
         src: ../files/traefik-values.yaml
         dest: /root/traefik-values.yaml
-        mode: "0644"
+        mode: "0600"
 
     - name: Valider le chart avec les values (helm template)
-      ansible.builtin.command: helm template traefik traefik/traefik -n traefik -f /root/traefik-values.yaml
+      ansible.builtin.command: helm template traefik traefik/traefik --version {{ traefik_chart_version }} -n traefik -f /root/traefik-values.yaml
       register: tpl
       changed_when: false
-      failed_when: tpl.rc != 0
-      no_log: false
 
     - name: Installer Traefik
       ansible.builtin.command: >
-        helm upgrade --install traefik traefik/traefik -n traefik --create-namespace
+        helm upgrade --install traefik traefik/traefik --version {{ traefik_chart_version }} -n traefik --create-namespace
         -f /root/traefik-values.yaml --wait --timeout 5m
       changed_when: true
 

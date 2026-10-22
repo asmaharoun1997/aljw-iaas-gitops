@@ -1,13 +1,13 @@
 # Copier en inventory.ini (ignoré par Git).
 # Les VM n'ont pas d'IP publique : SSH via le tunnel IAP + OS Login (compte Google).
 # ansible_host = NOM de l'instance (utilisé par le ProxyCommand IAP), pas l'IP.
-# L'ordre des workers compte : le 1er héberge GitLab (pool=gitlab), le 2e les applications.
+# node_pool donne le label pool= du nœud : gitlab (w1, héberge GitLab) ou main (w2, applications).
 [control_plane]
 aljw-k8s-cp ansible_host=aljw-k8s-cp
 
 [workers]
-aljw-k8s-w1 ansible_host=aljw-k8s-w1
-aljw-k8s-w2 ansible_host=aljw-k8s-w2
+aljw-k8s-w1 ansible_host=aljw-k8s-w1 node_pool=gitlab
+aljw-k8s-w2 ansible_host=aljw-k8s-w2 node_pool=main
 
 [k8s:children]
 control_plane

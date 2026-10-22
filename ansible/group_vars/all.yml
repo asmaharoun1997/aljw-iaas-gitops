@@ -21,3 +21,10 @@ local_path_version: "v0.0.31"
 
 credential_provider_bin_dir: /usr/local/bin/image-credential-providers
 credential_provider_config: /etc/kubernetes/image-credential-provider.yaml
+
+# Helm et chart Traefik figés (aucun script depuis une branche mouvante).
+# Version de Helm déjà installée sur le master : v3.22.1.
+helm_version: "v3.22.1"
+# Somme de contrôle : fichier .sha256sum officiel du même tarball (remplacer par la valeur littérale quand elle est notée).
+helm_sha256_url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz.sha256sum"
+traefik_chart_version: "42.1.2"

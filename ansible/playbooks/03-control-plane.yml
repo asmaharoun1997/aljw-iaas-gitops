@@ -19,6 +19,21 @@
         dest: "{{ lookup('env', 'HOME') }}/.kube/aljw-iaas.yaml"
         flat: true
 
+    - name: "Dossier ~/.kube du poste de contrôle en 0700"
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') }}/.kube"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
+    - name: "Droits stricts (0600) sur le kubeconfig cluster-admin local"
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') }}/.kube/aljw-iaas.yaml"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
     - name: Attendre que l'API réponde
       ansible.builtin.command: kubectl --kubeconfig /etc/kubernetes/admin.conf get --raw=/readyz
       register: readyz

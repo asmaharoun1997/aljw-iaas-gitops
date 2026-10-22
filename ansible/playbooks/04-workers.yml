@@ -25,9 +25,17 @@
 - name: Étiqueter les nœuds
   hosts: control_plane
   tasks:
-    - name: "Premier worker de l'inventaire = GitLab, second = applications"
-      ansible.builtin.shell: |
-        export KUBECONFIG=/etc/kubernetes/admin.conf
-        kubectl label node {{ groups['workers'][0] }} pool=gitlab --overwrite
-        kubectl label node {{ groups['workers'][1] }} pool=main --overwrite
-      changed_when: true
+    - name: "Chaque worker doit avoir node_pool dans l'inventaire"
+      ansible.builtin.assert:
+        that: hostvars[item].node_pool is defined
+        fail_msg: "node_pool manquant pour {{ item }} : ajouter node_pool=gitlab ou node_pool=main dans inventory.ini"
+        quiet: true
+      loop: "{{ groups['workers'] }}"
+
+    - name: "Étiqueter chaque worker avec pool=<node_pool de l'inventaire>"
+      ansible.builtin.command: >
+        kubectl --kubeconfig /etc/kubernetes/admin.conf
+        label node {{ item }} pool={{ hostvars[item].node_pool }} --overwrite
+      loop: "{{ groups['workers'] }}"
+      register: label_out
+      changed_when: "'not labeled' not in label_out.stdout"
