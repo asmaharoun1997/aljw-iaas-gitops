@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../apps/dev
+images:
+  - name: IMAGE_PLACEHOLDER
+    newName: europe-west1-docker.pkg.dev/formation-equipe1/aljw-docker/lms
+    newTag: mysql-ab38fe7
+patches:
+  - target: { kind: Deployment, name: lms }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value: { pool: main }
+  - target: { kind: StatefulSet, name: mysql }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value: { pool: main }
+  - target: { kind: Ingress, name: lms }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev.aljw-cluster-iaas.kn8x.net
+      - op: remove
+        path: /spec/tls

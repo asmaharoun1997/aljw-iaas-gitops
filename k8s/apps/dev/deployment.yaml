@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lms
+  namespace: dev
+spec:
+  replicas: 1                      # volume RWO : un seul pod tant qu'il n'y a pas de stockage partage
+  strategy:
+    type: Recreate                 # evite deux pods sur le meme volume pendant un deploiement
+  selector:
+    matchLabels: { app: lms }
+  template:
+    metadata:
+      labels: { app: lms }
+    spec:
+      containers:
+        - name: lms
+          image: IMAGE_PLACEHOLDER # remplace par le pipeline (sed) ; image dans Artifact Registry aljw-docker, tiree via le credential provider (Jules)
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef: { name: lms-config }
+          env:
+            - name: LMS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: mysql-creds, key: password }
+            - name: LMS_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: lms-admin, key: password }
+          volumeMounts:
+            - name: data
+              mountPath: /data/lms
+          readinessProbe:
+            httpGet: { path: /lms/, port: 8080 }                   # A CONFIRMER (chemin de sante)
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1Gi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: lms-data }
