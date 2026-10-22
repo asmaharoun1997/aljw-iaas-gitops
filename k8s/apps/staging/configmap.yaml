@@ -1,17 +1,9 @@
-# Squelette k8s/staging/ -> a dupliquer pour dev et preprod (remplacer "staging").
-# Decouper ensuite en un fichier par ressource : configmap.yaml, pvc.yaml,
-# deployment.yaml, service.yaml, ingress.yaml.
-#
-# JAMAIS de Secret dans ce dossier : lms-admin et mysql-creds sont crees a la main
-# (kubectl create secret ...), puis references ci-dessous.
-#
-# Les lignes marquees "A CONFIRMER" dependent de Wahid (config MySQL de l'appli),
-# de Jules (StorageClass) ou de la phase 1 (nom de domaine).
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: lms-config
   namespace: staging
 data:
-  DB_URL: "jdbc:mysql://10.3.0.5:3306/lms"   # staging = 10.3.0.5, preprod = 10.3.0.4 (a changer a la main). Options JDBC : A CONFIRMER (Wahid)
-  DB_USER: "lms"                                                   # utilisateur = lms ; NOM DES VARIABLES : A CONFIRMER (Wahid)
+  LMS_DB_URL: "jdbc:mysql://10.3.0.5:3306/lms"
+  LMS_DB_USER: "lms"
+  LMS_DATA_DIR: "/data/lms"

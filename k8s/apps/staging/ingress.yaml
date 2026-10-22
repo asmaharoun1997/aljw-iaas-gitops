@@ -8,10 +8,10 @@ metadata:
 spec:
   ingressClassName: traefik
   tls:
-    - hosts: ["staging.<domaine>"]                                 # A CONFIRMER (DNS)
+    - hosts: ["staging.iaas.aljw-cluster.kn8x.net"]                                 # A CONFIRMER (DNS)
       secretName: lms-tls
   rules:
-    - host: staging.<domaine>                                      # A CONFIRMER (DNS)
+    - host: staging.iaas.aljw-cluster.kn8x.net                                      # A CONFIRMER (DNS)
       http:
         paths:
           - path: /

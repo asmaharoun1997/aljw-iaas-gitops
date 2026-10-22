@@ -2,16 +2,16 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: lms
-  namespace: staging
+  namespace: dev
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt
 spec:
   ingressClassName: traefik
   tls:
-    - hosts: ["staging.<domaine>"]                                 # A CONFIRMER (DNS)
+    - hosts: ["dev.iaas.aljw-cluster.kn8x.net"]                                 # A CONFIRMER (DNS)
       secretName: lms-tls
   rules:
-    - host: staging.<domaine>                                      # A CONFIRMER (DNS)
+    - host: dev.iaas.aljw-cluster.kn8x.net                                      # A CONFIRMER (DNS)
       http:
         paths:
           - path: /

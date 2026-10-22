@@ -1,4 +1,4 @@
-﻿# k8s/dev/networkpolicy.yaml -> a dupliquer pour staging et preprod
+# k8s/dev/networkpolicy.yaml -> a dupliquer pour staging et preprod
 # (remplacer "dev" par le nom du namespace).
 # 1) tout trafic ENTRANT est refuse, sauf celui venant du namespace traefik ;
 # 2) les pods ne peuvent pas joindre 169.254.169.254 (serveur de metadonnees GCE :
@@ -8,7 +8,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny-ingress
-  namespace: staging
+  namespace: preprod
 spec:
   podSelector: {}
   policyTypes: ["Ingress"]
@@ -17,7 +17,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-from-traefik
-  namespace: staging
+  namespace: preprod
 spec:
   podSelector:
     matchLabels:
@@ -36,7 +36,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: deny-metadata-egress
-  namespace: staging
+  namespace: preprod
 spec:
   podSelector: {}
   policyTypes: ["Egress"]

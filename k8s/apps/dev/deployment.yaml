@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: lms
-  namespace: staging
+  namespace: dev
 spec:
   replicas: 1                      # volume RWO : un seul pod tant qu'il n'y a pas de stockage partage
   strategy:
@@ -21,10 +21,10 @@ spec:
           envFrom:
             - configMapRef: { name: lms-config }
           env:
-            - name: DB_PASSWORD                                    # A CONFIRMER (nom lu par l'appli)
+            - name: LMS_DB_PASSWORD
               valueFrom:
                 secretKeyRef: { name: mysql-creds, key: password }
-            - name: LMS_ADMIN_PASSWORD                             # A CONFIRMER (nom lu par l'appli)
+            - name: LMS_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef: { name: lms-admin, key: password }
           volumeMounts:
