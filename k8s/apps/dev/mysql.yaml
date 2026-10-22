@@ -1,0 +1,91 @@
+# k8s/apps/dev/mysql.yaml : MySQL de l'environnement DEV (pod dans le cluster).
+# Staging et preprod utilisent Cloud SQL ; ce fichier n'existe que pour dev.
+#
+# Image : copie de mysql:8.0.46 dans Artifact Registry (aljw-docker), meme version
+# que Cloud SQL. Verifier que le tag existe avant la copie.
+# Le Secret "mysql-creds" (cles : root-password, password) est cree a la main,
+# jamais dans Git. Nom du Secret a confirmer avec Asma.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: dev
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels: { app: mysql }
+  template:
+    metadata:
+      labels: { app: mysql }
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: mysql
+          image: europe-west1-docker.pkg.dev/formation-equipe1/aljw-docker/mysql:8.0.46
+          args:
+            - --character-set-server=utf8mb4
+            - --collation-server=utf8mb4_0900_ai_ci
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_DATABASE
+              value: lms
+            - name: MYSQL_USER
+              value: lms
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: mysql-creds, key: password }
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: mysql-creds, key: root-password }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "127.0.0.1"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 1Gi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: dev
+spec:
+  selector: { app: mysql }
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+# Seul le LMS peut joindre MySQL (le refus par defaut en entree est dans networkpolicy.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-lms-to-mysql
+  namespace: dev
+spec:
+  podSelector:
+    matchLabels: { app: mysql }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: lms }
+      ports:
+        - protocol: TCP
+          port: 3306
