@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: lms-data
-  namespace: preprod
+  namespace: prod
 spec:
   accessModes: ["ReadWriteOnce"]
   storageClassName: local-path

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: lms-config
-  namespace: preprod
+  namespace: prod
 data:
   LMS_DB_URL: "jdbc:mysql://10.3.0.4:3306/lms?serverTimezone=UTC&characterEncoding=utf8"
   LMS_DB_USER: "lms"

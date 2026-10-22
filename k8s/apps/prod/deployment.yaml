@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: lms
-  namespace: preprod
+  namespace: prod
 spec:
   replicas: 1                      # volume RWO : un seul pod tant qu'il n'y a pas de stockage partage
   strategy:
