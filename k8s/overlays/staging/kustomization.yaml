@@ -5,7 +5,7 @@ resources:
 images:
   - name: IMAGE_PLACEHOLDER
     newName: europe-west1-docker.pkg.dev/formation-equipe1/aljw-docker/lms
-    newTag: mysql-ab38fe7
+    newTag: b75b387b
 patches:
   - target: { kind: Deployment, name: lms }
     patch: |-
