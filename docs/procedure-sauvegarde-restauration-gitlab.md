@@ -1,7 +1,7 @@
 # Procédure de sauvegarde et de restauration de GitLab
 
-**Statut : sauvegarde réalisée et vérifiée (22/10/2026) ; restauration non encore testée.**
-À mettre à jour après le premier test de restauration sur le nouveau cluster.
+**Statut : sauvegarde réalisée et vérifiée (22/10/2026) ; restauration testée avec succès sur le nouveau cluster (23/10/2026, voir le §6).**
+À refaire au cutover avec une sauvegarde finale.
 
 Aucun secret n'est écrit dans ce document. Les fichiers sensibles restent dans le bucket privé.
 
@@ -86,3 +86,29 @@ Ne jamais tester la restauration sur le GitLab de GKE, qui est en service.
 - Le bucket est versionné : supprimer un fichier ne l'efface pas. En fin de TP, supprimer **toutes les versions** (le bucket contient les clés de chiffrement), après accord d'Asma.
 - L'archive reste aussi dans le pod GitLab de GKE (`/var/opt/gitlab/backups`) : ne la supprimer qu'avec l'accord d'Asma.
 - Ne jamais mettre ces fichiers dans Git ni dans une conversation.
+
+## 6. Test de restauration du 23/10/2026 (nouveau cluster)
+
+**Résultat : restauration réussie** à partir de la sauvegarde `20261022-1028`.
+
+| Élément | Valeur |
+|---|---|
+| GitLab cible | CE 19.5.0, Deployment `gitlab` (namespace `gitlab-system`), volume `gitlab-data` de 30 Go sur le worker w1, avec les sous-dossiers `data`, `config` et `logs` montés sur `/var/opt/gitlab`, `/etc/gitlab` et `/var/log/gitlab` |
+| Services après restauration | tous en `run` (puma et sidekiq compris) |
+| `gitlab:doctor:secrets` | 0 échec de déchiffrement |
+| `gitlab:check` | tout en `yes` ; 2 projets et 4 utilisateurs actifs retrouvés |
+
+**Écarts avec le §4 et enseignements**
+
+- L'API du nouveau cluster est privée : tous les `kubectl` (dont `kubectl cp`) se font depuis la VM `aljw-k8s-cp`, via IAP. Les fichiers passent du bucket au poste (`gcloud storage cp`), du poste à la VM (`gcloud compute scp`), puis de la VM au pod. Les copies sur le poste et sur la VM sont supprimées ensuite.
+- La VM n'a volontairement pas accès au bucket (erreur 403) : ne pas lui donner ce droit, le bucket contient les clés de chiffrement.
+- Avant d'écraser `gitlab-secrets.json` dans le pod, en garder une copie (`gitlab-secrets.json.install`).
+- Le `gitlab.rb` de la sauvegarde est identique au modèle du nouveau pod (même empreinte, aucun réglage actif) : rien à fusionner. La configuration réelle (adresse externe, proxy) est dans la variable `GITLAB_OMNIBUS_CONFIG` du déploiement.
+- `GITLAB_ASSUME_YES=1` évite les deux confirmations interactives de `gitlab-backup restore` quand `kubectl exec` est lancé sans terminal.
+- Après restauration, le mot de passe `root` et les comptes sont ceux de l'ancien GitLab ; le secret `gitlab-initial-root` ne sert plus.
+- `gitlab-ctl reconfigure` signale des réglages `nginx[...]` dépréciés dans `GITLAB_OMNIBUS_CONFIG` : sans effet, à corriger plus tard.
+
+**Limites**
+
+- Le nouveau GitLab est une copie figée au 22/10/2026 : les dépôts à jour restent dans l'ancien GitLab jusqu'au cutover, où cette procédure sera refaite avec une sauvegarde finale.
+- Non testés : enregistrement d'un Runner, pipeline, accès Git par SSH.
