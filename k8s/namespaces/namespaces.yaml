@@ -1,0 +1,26 @@
+# Namespaces propres a la plateforme, tels qu'ils existent sur le cluster kubeadm.
+# Les autres namespaces sont crees par leurs outils : calico/tigera (Calico),
+# cert-manager et traefik (Helm via Ansible), flux-system (installation Flux).
+#
+# Ce fichier decrit l'existant : il a ete cree a la main et n'est pas applique par Flux.
+# Ne PAS l'ajouter a une Kustomization Flux avec prune active : une suppression du
+# fichier supprimerait le namespace et tout son contenu (volumes compris).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitlab-system
